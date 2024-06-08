@@ -19,7 +19,7 @@ plugins {
 }
 
 kmpConfiguration {
-    configureShared(java9ModuleName = "org.kotlincrypto.hash.blake2b", publish = true) {
+    configureShared(java9ModuleName = "org.kotlincrypto.hash.blake2", publish = true) {
         common {}
     }
 }

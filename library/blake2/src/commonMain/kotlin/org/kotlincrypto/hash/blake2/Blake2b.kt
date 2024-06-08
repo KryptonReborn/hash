@@ -1,4 +1,4 @@
-package org.kotlincrypto.hash.blake2b
+package org.kotlincrypto.hash.blake2
 
 /*  The BLAKE2 cryptographic hash function was designed by Jean-
  Philippe Aumasson, Samuel Neves, Zooko Wilcox-O'Hearn, and Christian
@@ -35,7 +35,7 @@ package org.kotlincrypto.hash.blake2b
  * between 1 and 64 bytes.
  */
 
-public class Blake2b {
+public class Blake2b : Digest {
     public companion object {
         // To use for Catenas H'
         private const val ROUNDS_IN_COMPRESS = 12
@@ -74,8 +74,8 @@ public class Blake2b {
         )
 
         /**
-         * Hash [input] as Blake2B-160 .
-         * @return hashed [ByteArray] with size=20.
+         * Hash [input] as Blake2b-160 .
+         * @return hashed [ByteArray] with size = 20.
          */
         public fun blake2bHash160(input: ByteArray): ByteArray {
             val blake2b = Blake2b(160)
@@ -86,8 +86,8 @@ public class Blake2b {
         }
 
         /**
-         * Hash [input] as Blake2B-224 .
-         * @return hashed [ByteArray] with size=28.
+         * Hash [input] as Blake2b-224 .
+         * @return hashed [ByteArray] with size = 28.
          */
         public fun blake2bHash224(input: ByteArray): ByteArray {
             val blake2b = Blake2b(224)
@@ -98,8 +98,8 @@ public class Blake2b {
         }
 
         /**
-         * Hash [input] as Blake2B-256 .
-         * @return hashed [ByteArray] with size=32.
+         * Hash [input] as Blake2b-256 .
+         * @return hashed [ByteArray] with size = 32.
          */
         public fun blake2bHash256(input: ByteArray): ByteArray {
             val blake2b = Blake2b(256)
@@ -115,17 +115,14 @@ public class Blake2b {
     private var keyLength = 0 // 0 - 64 bytes for keyed hashing for MAC
     private var salt: ByteArray? = null // new byte[16];
     private var personalization: ByteArray? = null // new byte[16];
-
-    // the key
     private var key: ByteArray? = null
 
-    // whenever this buffer overflows, it will be processed
-    // in the compress() function.
+    // whenever this buffer overflows, it will be processed in the compress() function.
     // For performance issues, long messages will not use this buffer.
     private var buffer: ByteArray? = null // new byte[BLOCK_LENGTH_BYTES];
 
     // Position of last inserted byte:
-    private var bufferPos = 0 // a value from 0 up to 128
+    private var bufferPos = 0 // a value from 0 up to BLOCK_LENGTH_BYTES
 
     // In the Blake2b paper it is called: v
     private val internalState = LongArray(16)
@@ -159,23 +156,25 @@ public class Blake2b {
     /**
      * Basic sized constructor - size in bits.
      *
-     * @param digestSize size of digest (in bits)
+     * @param digestBits size of digest (in bits)
      */
-    public constructor(digestSize: Int = 512) {
-        require(!(digestSize < 8 || digestSize > 512 || digestSize % 8 != 0)) {
+    public constructor(digestBits: Int = 512) {
+        require(!(digestBits < 8 || digestBits > 512 || digestBits % 8 != 0)) {
             "BLAKE2b digest bit length must be a multiple of 8 and not greater than 512"
         }
         buffer = ByteArray(BLOCK_LENGTH_BYTES)
         keyLength = 0
-        this.digestLength = digestSize / 8
+        this.digestLength = digestBits / 8
         initChainValue()
     }
 
     /**
      * Blake2b for authentication ("Prefix-MAC mode").
+     *
      * After calling the doFinal() method, the key will
      * remain to be used for further computations of
      * this instance.
+     *
      * The key can be overwritten using the clearKey() method.
      *
      * @param key A key up to 64 bytes or null
@@ -195,13 +194,15 @@ public class Blake2b {
 
     /**
      * Blake2b with key, required digest length (in bytes), salt and personalization.
+     *
      * After calling the doFinal() method, the key, the salt and the personal string
      * will remain and might be used for further computations with this instance.
+     *
      * The key can be overwritten using the clearKey() method, the salt (pepper)
      * can be overwritten using the clearSalt() method.
      *
      * @param key             A key up to 64 bytes or null
-     * @param digestLength    from 1 up to 64 bytes
+     * @param digestLength    From 1 up to 64 bytes
      * @param salt            16 bytes or null
      * @param personalization 16 bytes or null
      */
@@ -235,17 +236,16 @@ public class Blake2b {
         initChainValue()
     }
 
-    /**
-     * Get digest length (in bytes) which range from 1 to 64
-     */
-    public fun getDigestLength(): Int = digestLength
+    override val algorithmName: String
+        get() = "BLAKE2b"
 
-    /**
-     * update the message digest with a single byte.
-     *
-     * @param input the input byte to be entered.
-     */
-    public fun update(input: Byte) {
+    override val digestSize: Int
+        get() = digestLength
+
+    override val byteLength: Int
+        get() = BLOCK_LENGTH_BYTES
+
+    override fun update(input: Byte) {
         // process the buffer if full else add to buffer:
         val remainingLength = BLOCK_LENGTH_BYTES - bufferPos
         if (remainingLength == 0) {
@@ -265,17 +265,10 @@ public class Blake2b {
         }
     }
 
-    /**
-     * update the message digest with a block of bytes.
-     *
-     * @param input the byte array containing the data.
-     * @param offset  the offset into the byte array where the data starts.
-     * @param length     the length of the data.
-     */
-    public fun update(
+    override fun update(
         input: ByteArray,
-        offset: Int = 0,
-        length: Int = input.size
+        offset: Int,
+        length: Int,
     ) {
         if (length == 0) {
             return
@@ -322,15 +315,7 @@ public class Blake2b {
         bufferPos += offset + length - messagePos
     }
 
-    /**
-     * close the digest, producing the final digest value. The doFinal
-     * call leaves the digest reset.
-     * Key, salt and personal string remain.
-     *
-     * @param out       the array the digest is to be copied into.
-     * @param outOffset the offset into the out array the digest is to start at.
-     */
-    public fun doFinal(out: ByteArray?, outOffset: Int): Int {
+    override fun doFinal(out: ByteArray, outOffset: Int): Int {
         f0 = -0x1L
         t0 += bufferPos.toLong()
         if (bufferPos > 0 && t0 == 0L) {
@@ -344,9 +329,9 @@ public class Blake2b {
             val bytes = ByteArray(8)
             encodeLELong(chainValue!![i], bytes, 0)
             if (i * 8 < digestLength - 8) {
-                bytes.copyInto(out!!, outOffset + i * 8, 0, 8)
+                bytes.copyInto(out, outOffset + i * 8, 0, 8)
             } else {
-                bytes.copyInto(out!!, outOffset + i * 8, 0, digestLength - i * 8)
+                bytes.copyInto(out, outOffset + i * 8, 0, digestLength - i * 8)
             }
             i++
         }
@@ -355,12 +340,7 @@ public class Blake2b {
         return digestLength
     }
 
-    /**
-     * Reset the digest back to it's initial state.
-     * The key, the salt and the personal string will
-     * remain for further computations.
-     */
-    public fun reset() {
+    override fun reset() {
         bufferPos = 0
         f0 = 0L
         t0 = 0L
@@ -374,24 +354,32 @@ public class Blake2b {
         initChainValue()
     }
 
-    /**
-     * Overwrite the key
-     * if it is no longer used (zeroization)
-     */
-    public fun clearKey() {
+    override fun clearKey() {
         if (key != null) {
             key?.fill(0)
             buffer?.fill(0)
         }
     }
 
-    /**
-     * Overwrite the salt (pepper) if it
-     * is secret and no longer used (zeroization)
-     */
-    public fun clearSalt() {
+    override fun clearSalt() {
         if (salt != null) {
             salt?.fill(0)
+        }
+    }
+
+    private fun initChainValue() {
+        if (chainValue == null) {
+            chainValue = LongArray(8)
+            blake2b_IV.copyInto(chainValue!!)
+            chainValue!![0] = (blake2b_IV[0] xor (digestLength.toLong() or (keyLength.toLong() shl 8) or 0x1010000L))
+            if (salt != null) {
+                chainValue!![4] = chainValue!![4] xor decodeLELong(salt!!, 0)
+                chainValue!![5] = chainValue!![5] xor decodeLELong(salt!!, 8)
+            }
+            if (personalization != null) {
+                chainValue!![6] = chainValue!![6] xor decodeLELong(personalization!!, 0)
+                chainValue!![7] = chainValue!![7] xor decodeLELong(personalization!!, 8)
+            }
         }
     }
 
@@ -421,22 +409,6 @@ public class Blake2b {
         }
     }
 
-    private fun initChainValue() {
-        if (chainValue == null) {
-            chainValue = LongArray(8)
-            blake2b_IV.copyInto(chainValue!!)
-            chainValue!![0] = (blake2b_IV[0] xor (digestLength.toLong() or (keyLength.toLong() shl 8) or 0x1010000L))
-            if (salt != null) {
-                chainValue!![4] = chainValue!![4] xor decodeLELong(salt!!, 0)
-                chainValue!![5] = chainValue!![5] xor decodeLELong(salt!!, 8)
-            }
-            if (personalization != null) {
-                chainValue!![6] = chainValue!![6] xor decodeLELong(personalization!!, 0)
-                chainValue!![7] = chainValue!![7] xor decodeLELong(personalization!!, 8)
-            }
-        }
-    }
-
     private fun initInternalState() {
         // initialize v:
         chainValue!!.copyInto(internalState, 0, 0, chainValue!!.size)
@@ -462,8 +434,8 @@ public class Blake2b {
     /**
      * Decode a 64-bit little-endian integer.
      *
-     * @param buf   the source buffer
-     * @param off   the source offset
+     * @param buf the source buffer
+     * @param off the source offset
      * @return the decoded integer
      */
     private inline fun decodeLELong(buf: ByteArray, off: Int): Long {
@@ -480,9 +452,9 @@ public class Blake2b {
     /**
      * Encode a 64-bit integer with little-endian convention.
      *
-     * @param [value]   the integer to encode
-     * @param dst   the destination buffer
-     * @param off   the destination offset
+     * @param [value] the integer to encode
+     * @param dst     the destination buffer
+     * @param off     the destination offset
      */
     private fun encodeLELong(value: Long, dst: ByteArray, off: Int) {
         dst[off + 0] = value.toByte()

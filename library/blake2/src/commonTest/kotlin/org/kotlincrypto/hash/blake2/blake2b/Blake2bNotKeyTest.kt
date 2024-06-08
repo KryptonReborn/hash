@@ -1,5 +1,6 @@
-package org.kotlincrypto.hash.blake2b
+package org.kotlincrypto.hash.blake2.blake2b
 
+import org.kotlincrypto.hash.blake2.Blake2b
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -39,6 +40,14 @@ class Blake2bNotKeyTest {
             NotKeyTestVector(
                 "abc",
                 "ba80a53f981c4d0d6a2797b69f12f6e94c212f14685ac4b74b12bb6fdbffa2d17d87c5392aab792dc252d5de4533cc9518d38aa8dbf1925ab92386edd4009923",
+            ),
+            NotKeyTestVector(
+                "UPPERCASE",
+                "da40d8f48e9e7560c56e2b92205aed6342a276994ca0287ea4f8c1423ef07d519ecb4bf8668c118379a36be8aa6c077bbc6213fa81fbb332fad9d8a19a7756e6"
+            ),
+            NotKeyTestVector(
+                "123456789",
+                "f5ab8bafa6f2f72b431188ac38ae2de7bb618fb3d38b6cbf639defcdd5e10a86b22fccff571da37e42b23b80b657ee4d936478f582280a87d6dbb1da73f5c47d"
             ),
         )
     }
@@ -128,7 +137,7 @@ class Blake2bNotKeyTest {
         // Hash the input
         val digest = Blake2b(key)
         digest.update(input, 0, input.size)
-        val hash = ByteArray(digest.getDigestLength())
+        val hash = ByteArray(digest.digestSize)
         digest.doFinal(hash, 0)
         // Using a second instance, hash the input without calling doFinal()
         val digest1 = Blake2b(key)
@@ -136,7 +145,7 @@ class Blake2bNotKeyTest {
         // Reset the second instance and hash the input again
         digest1.reset()
         digest1.update(input, 0, input.size)
-        val hash1 = ByteArray(digest.getDigestLength())
+        val hash1 = ByteArray(digest.digestSize)
         digest1.doFinal(hash1, 0)
         // The hashes should be identical
         assertContentEquals(hash1, hash)

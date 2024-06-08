@@ -1,0 +1,62 @@
+public final class org/kotlincrypto/hash/blake2/Blake2b : org/kotlincrypto/hash/blake2/Digest {
+	public static final field Companion Lorg/kotlincrypto/hash/blake2/Blake2b$Companion;
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lorg/kotlincrypto/hash/blake2/Blake2b;)V
+	public fun <init> ([B)V
+	public fun <init> ([BI[B[B)V
+	public fun clearKey ()V
+	public fun clearSalt ()V
+	public fun doFinal ([BI)I
+	public fun getAlgorithmName ()Ljava/lang/String;
+	public fun getByteLength ()I
+	public fun getDigestSize ()I
+	public fun reset ()V
+	public fun update (B)V
+	public fun update ([BII)V
+}
+
+public final class org/kotlincrypto/hash/blake2/Blake2b$Companion {
+	public final fun blake2bHash160 ([B)[B
+	public final fun blake2bHash224 ([B)[B
+	public final fun blake2bHash256 ([B)[B
+}
+
+public final class org/kotlincrypto/hash/blake2/Blake2s : org/kotlincrypto/hash/blake2/Digest {
+	public static final field Companion Lorg/kotlincrypto/hash/blake2/Blake2s$Companion;
+	public fun <init> (I)V
+	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Lorg/kotlincrypto/hash/blake2/Blake2s;)V
+	public fun <init> ([B)V
+	public fun <init> ([BI[B[B)V
+	public fun clearKey ()V
+	public fun clearSalt ()V
+	public fun doFinal ([BI)I
+	public fun getAlgorithmName ()Ljava/lang/String;
+	public fun getByteLength ()I
+	public fun getDigestSize ()I
+	public fun reset ()V
+	public fun update (B)V
+	public fun update ([BII)V
+}
+
+public final class org/kotlincrypto/hash/blake2/Blake2s$Companion {
+	public final fun blake2sHash128 ([B)[B
+}
+
+public abstract interface class org/kotlincrypto/hash/blake2/Digest {
+	public abstract fun clearKey ()V
+	public abstract fun clearSalt ()V
+	public abstract fun doFinal ([BI)I
+	public abstract fun getAlgorithmName ()Ljava/lang/String;
+	public abstract fun getByteLength ()I
+	public abstract fun getDigestSize ()I
+	public abstract fun reset ()V
+	public abstract fun update (B)V
+	public abstract fun update ([BII)V
+}
+
+public final class org/kotlincrypto/hash/blake2/Digest$DefaultImpls {
+	public static synthetic fun update$default (Lorg/kotlincrypto/hash/blake2/Digest;[BIIILjava/lang/Object;)V
+}
+

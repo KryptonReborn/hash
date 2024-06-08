@@ -1,5 +1,6 @@
-package org.kotlincrypto.hash.blake2b
+package org.kotlincrypto.hash.blake2.blake2b
 
+import org.kotlincrypto.hash.blake2.Blake2b
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -131,7 +132,7 @@ class Blake2bKeyedTest {
 
         blake2bCloneSource.update(message)
 
-        val hash = ByteArray(blake2bCloneSource.getDigestLength())
+        val hash = ByteArray(blake2bCloneSource.digestSize)
 
         val digClone = Blake2b(blake2bCloneSource)
 
