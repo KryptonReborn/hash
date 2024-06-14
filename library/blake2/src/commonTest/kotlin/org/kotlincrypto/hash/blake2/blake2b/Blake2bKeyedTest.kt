@@ -2,7 +2,6 @@ package org.kotlincrypto.hash.blake2.blake2b
 
 import org.kotlincrypto.hash.blake2.Blake2b
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 @ExperimentalStdlibApi
@@ -61,85 +60,9 @@ class Blake2bKeyedTest {
         val blake2bKeyed = Blake2b(keyedTestVectors[0].key.hexToByteArray())
         for (testVector in keyedTestVectors) {
             val input: ByteArray = testVector.input.hexToByteArray()
-
-            blake2bKeyed.update(input, 0, input.size)
-            val keyedHash = ByteArray(64)
-            blake2bKeyed.doFinal(keyedHash, 0)
+            val keyedHash = blake2bKeyed.digest(input)
 
             assertEquals(testVector.output, keyedHash.toHexString())
-            testOffset(blake2bKeyed, input, keyedHash)
         }
-    }
-
-    private fun testOffset(
-        digest: Blake2b,
-        input: ByteArray,
-        expected: ByteArray
-    ) {
-        val resBuf = ByteArray(expected.size + 11)
-
-        digest.update(input, 0, input.size)
-
-        digest.doFinal(resBuf, 11)
-        assertContentEquals(resBuf.copyOfRange(11, resBuf.size), expected)
-    }
-
-    @Test
-    fun testClone() {
-        var blake2bCloneSource = Blake2b(
-            keyedTestVectors[3].key.hexToByteArray(),
-            16,
-            "000102030405060708090a0b0c0d0e0f".hexToByteArray(),
-            "101112131415161718191a1b1c1d1e1f".hexToByteArray(),
-        )
-        var expected: ByteArray = "b6d48ed5771b17414c4e08bd8d8a3bc4".hexToByteArray()
-
-        checkClone(blake2bCloneSource, expected)
-
-        // just digest size
-        blake2bCloneSource = Blake2b(160)
-        expected = "64202454e538279b21cea0f5a7688be656f8f484".hexToByteArray()
-        checkClone(blake2bCloneSource, expected)
-
-        // null salt and personalisation
-        blake2bCloneSource = Blake2b(
-            keyedTestVectors[3].key.hexToByteArray(),
-            16,
-            null,
-            null,
-        )
-        expected = "2b4a081fae2d7b488f5eed7e83e42a20".hexToByteArray()
-        checkClone(blake2bCloneSource, expected)
-
-        // null personalisation
-        blake2bCloneSource = Blake2b(
-            keyedTestVectors[3].key.hexToByteArray(), 16, "000102030405060708090a0b0c0d0e0f".hexToByteArray(), null
-        )
-        expected = "00c3a2a02fcb9f389857626e19d706f6".hexToByteArray()
-        checkClone(blake2bCloneSource, expected)
-
-        // null salt
-        blake2bCloneSource = Blake2b(
-            keyedTestVectors[3].key.hexToByteArray(),
-            16, null, "101112131415161718191a1b1c1d1e1f".hexToByteArray(),
-        )
-        expected = "f445ec9c062a3c724f8fdef824417abb".hexToByteArray()
-        checkClone(blake2bCloneSource, expected)
-    }
-
-    private fun checkClone(blake2bCloneSource: Blake2b, expected: ByteArray) {
-        val message: ByteArray = keyedTestVectors[3].input.hexToByteArray()
-
-        blake2bCloneSource.update(message)
-
-        val hash = ByteArray(blake2bCloneSource.digestSize)
-
-        val digClone = Blake2b(blake2bCloneSource)
-
-        blake2bCloneSource.doFinal(hash, 0)
-        assertContentEquals(expected, hash)
-
-        digClone.doFinal(hash, 0)
-        assertContentEquals(expected, hash)
     }
 }

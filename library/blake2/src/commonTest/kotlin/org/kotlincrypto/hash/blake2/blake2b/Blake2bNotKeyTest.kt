@@ -61,8 +61,7 @@ class Blake2bNotKeyTest {
                 blake2bNotKey.update(input[j])
             }
 
-            val notKeyHash = ByteArray(64)
-            blake2bNotKey.doFinal(notKeyHash, 0)
+            val notKeyHash = blake2bNotKey.digest()
 
             assertEquals(testVector.output, notKeyHash.toHexString())
         }
@@ -91,7 +90,7 @@ class Blake2bNotKeyTest {
         assertFailsWith<IllegalArgumentException> {
             Blake2b(null, -1, null, null)
         }.also {
-            assertEquals("Invalid digest length (required: 1 - 64)", it.message)
+            assertEquals("digestLength cannot be negative", it.message)
         }
 
         assertFailsWith<IllegalArgumentException> {
@@ -109,14 +108,8 @@ class Blake2bNotKeyTest {
             val dig1 = Blake2b(i * 8)
             val dig2 = Blake2b(null, i, null, null)
 
-            val out1 = ByteArray(i)
-            val out2 = ByteArray(i)
-
-            dig1.update(abc, 0, abc.size)
-            dig2.update(abc, 0, abc.size)
-
-            dig1.doFinal(out1, 0)
-            dig2.doFinal(out2, 0)
+            val out1 = dig1.digest(abc)
+            val out2 = dig2.digest(abc)
 
             assertContentEquals(out1, out2)
         }
@@ -136,17 +129,15 @@ class Blake2bNotKeyTest {
         }
         // Hash the input
         val digest = Blake2b(key)
-        digest.update(input, 0, input.size)
-        val hash = ByteArray(digest.digestSize)
-        digest.doFinal(hash, 0)
+        digest.update(input)
+        val hash = digest.digest(input)
         // Using a second instance, hash the input without calling doFinal()
         val digest1 = Blake2b(key)
-        digest1.update(input, 0, input.size)
+        digest1.update(input)
         // Reset the second instance and hash the input again
         digest1.reset()
-        digest1.update(input, 0, input.size)
-        val hash1 = ByteArray(digest.digestSize)
-        digest1.doFinal(hash1, 0)
+        digest1.update(input)
+        val hash1 = digest1.digest()
         // The hashes should be identical
         assertContentEquals(hash1, hash)
     }

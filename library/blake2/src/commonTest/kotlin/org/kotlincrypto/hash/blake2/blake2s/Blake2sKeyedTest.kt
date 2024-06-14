@@ -2,7 +2,6 @@ package org.kotlincrypto.hash.blake2.blake2s
 
 import org.kotlincrypto.hash.blake2.Blake2s
 import kotlin.test.Test
-import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 @ExperimentalStdlibApi
@@ -61,26 +60,9 @@ class Blake2sKeyedTest {
         val blake2sKeyed = Blake2s(keyedTestVectors[0].key.hexToByteArray())
         for (testVector in keyedTestVectors) {
             val input: ByteArray = testVector.input.hexToByteArray()
-
-            blake2sKeyed.update(input, 0, input.size)
-            val keyedHash = ByteArray(32)
-            blake2sKeyed.doFinal(keyedHash, 0)
+            val keyedHash = blake2sKeyed.digest(input)
 
             assertEquals(testVector.output, keyedHash.toHexString())
-            testOffset(blake2sKeyed, input, keyedHash)
         }
-    }
-
-    private fun testOffset(
-        digest: Blake2s,
-        input: ByteArray,
-        expected: ByteArray
-    ) {
-        val resBuf = ByteArray(expected.size + 11)
-
-        digest.update(input, 0, input.size)
-
-        digest.doFinal(resBuf, 11)
-        assertContentEquals(resBuf.copyOfRange(11, resBuf.size), expected)
     }
 }

@@ -351,10 +351,7 @@ class Blake2bSaltPersonalizationTest {
                 personalization = testVector.personalization.hexToByteArray(),
             )
             val input: ByteArray = testVector.input.hexToByteArray()
-
-            blake2b.update(input, 0, input.size)
-            val keyedHash = ByteArray(testVector.outputLength)
-            blake2b.doFinal(keyedHash, 0)
+            val keyedHash = blake2b.digest(input)
 
             assertEquals(testVector.output, keyedHash.toHexString())
         }
