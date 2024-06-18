@@ -130,7 +130,7 @@ class Blake2bNotKeyTest {
         // Hash the input
         val digest = Blake2b(key)
         digest.update(input)
-        val hash = digest.digest(input)
+        val hash = digest.digest()
         // Using a second instance, hash the input without calling doFinal()
         val digest1 = Blake2b(key)
         digest1.update(input)
