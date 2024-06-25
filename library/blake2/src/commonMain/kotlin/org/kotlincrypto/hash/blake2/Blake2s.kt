@@ -46,8 +46,6 @@ public class Blake2s : Digest {
         // The size in bytes of the internal buffer the digest applies its compression
         private const val BLOCK_LENGTH_BYTES: Int = 64
 
-        private const val MAX_DIGEST_LENGTH: Int = 32
-
         private const val ALGORITHM_NAME = "BLAKE2s"
 
         // BLAKE2s Initialization Vector:
@@ -87,32 +85,8 @@ public class Blake2s : Digest {
         }
     }
 
-    // General parameters:
-    private var digestLength = MAX_DIGEST_LENGTH // 1- 32 bytes
-    private var keyLength = 0 // 0 - 32 bytes for keyed hashing for MAC
-    private var salt: ByteArray? = null
-    private var personalization: ByteArray? = null
-    private var key: ByteArray? = null
-
-    // Tree hashing parameters:
-    // The Tree Hashing Mode is not supported but these are used for
-    // the XOF implementation
-    private var fanout = 1 // 0-255
-    private var depth = 1 // 0-255
-    private var leafLength = 0
-    private var nodeOffset = 0L
-    private var nodeDepth = 0
-    private var innerHashLength = 0
-
-    // whenever this buffer overflows, it will be processed in the compress() function.
-    // For performance issues, long messages will not use this buffer.
-    private var _buffer: ByteArray? = null
-
-    // Position of last inserted byte:
-    private var bufferPos = 0 // a value from 0 up to BLOCK_LENGTH_BYTES
-
     // Internal state, in the BLAKE2 paper it is called v
-    private var internalState = IntArray(16)
+    private val internalState = IntArray(16)
 
     // State vector, in the BLAKE2 paper it is called h
     private var chainValue: IntArray? = null
@@ -120,32 +94,14 @@ public class Blake2s : Digest {
     // holds last significant bits of counter (counts bytes)
     private var t0 = 0
 
-    // counter: Length up to 2^64 are supported
-    private var t1 = 0
-
     // finalization flag, for last block: ~0
     private var f0 = 0
 
     @OptIn(InternalKotlinCryptoApi::class)
-    public constructor(digest: Blake2s) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digest.digestLength) {
-        bufferPos = digest.bufferPos
-        _buffer = digest._buffer?.copyOf()
-        keyLength = digest.keyLength
-        key = digest.key?.copyOf()
-        digestLength = digest.digestLength
-        internalState = internalState.copyOf()
+    public constructor(digest: Blake2s) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digest.digestLength()) {
         chainValue = digest.chainValue?.copyOf()
         t0 = digest.t0
-        t1 = digest.t1
         f0 = digest.f0
-        salt = digest.salt?.copyOf()
-        personalization = digest.personalization?.copyOf()
-        fanout = digest.fanout
-        depth = digest.depth
-        leafLength = digest.leafLength
-        nodeOffset = digest.nodeOffset
-        nodeDepth = digest.nodeDepth
-        innerHashLength = digest.innerHashLength
     }
 
     /**
@@ -158,138 +114,25 @@ public class Blake2s : Digest {
         require(!(digestBits < 8 || digestBits > 256 || digestBits % 8 != 0)) {
             "BLAKE2s digest bit length must be a multiple of 8 and not greater than 256"
         }
-        digestLength = digestBits / 8
-        init(null, null, null)
-    }
-
-    /**
-     * BLAKE2s for authentication ("Prefix-MAC mode").
-     *
-     * After calling the doFinal() method, the key will remain to be used for
-     * further computations of this instance.
-     *
-     * The key can be overwritten using the clearKey() method.
-     *
-     * @param key a key up to 32 bytes or null
-     */
-    @OptIn(InternalKotlinCryptoApi::class)
-    public constructor(key: ByteArray?) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, MAX_DIGEST_LENGTH) {
-        init(null, null, key)
-    }
-
-    /**
-     * BLAKE2s with key, required digest length, salt and personalization.
-     *
-     * After calling the doFinal() method, the key, the salt and the personal
-     * string will remain and might be used for further computations with this
-     * instance.
-     *
-     * The key can be overwritten using the clearKey() method, the
-     * salt (pepper) can be overwritten using the clearSalt() method.
-     *
-     * @param key             a key up to 32 bytes or null
-     * @param digestLength     from 1 up to 32 bytes
-     * @param salt            8 bytes or null
-     * @param personalization 8 bytes or null
-     */
-    @OptIn(InternalKotlinCryptoApi::class)
-    public constructor(
-        key: ByteArray?,
-        digestLength: Int,
-        salt: ByteArray?,
-        personalization: ByteArray?
-    ) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digestLength) {
-        require(!(digestLength < 1 || digestLength > MAX_DIGEST_LENGTH)) { "Invalid digest length (required: 1 - 32)" }
-        this.digestLength = digestLength
-        init(salt, personalization, key)
-    }
-
-    override fun updateDigest(input: Byte) {
-        // process the buffer if full else add to buffer:
-        val remainingLength: Int = BLOCK_LENGTH_BYTES - bufferPos // left bytes of buffer
-        if (remainingLength == 0) { // full buffer
-            t0 += BLOCK_LENGTH_BYTES
-            if (t0 == 0) { // if message > 2^32
-                t1++
-            }
-            compress(_buffer!!, 0)
-            _buffer?.fill(0) // clear buffer
-            _buffer!![0] = input
-            bufferPos = 1
-        } else {
-            _buffer!![bufferPos] = input
-            bufferPos++
-        }
-    }
-
-    override fun updateDigest(
-        input: ByteArray,
-        offset: Int,
-        len: Int,
-    ) {
-        if (len == 0) {
-            return
-        }
-        var remainingLength = 0 // left bytes of buffer
-        if (bufferPos != 0) {
-            // commenced, incomplete buffer
-            // complete the buffer:
-            remainingLength = BLOCK_LENGTH_BYTES - bufferPos
-            if (remainingLength < len) { // full buffer + at least 1 byte
-                input.copyInto(_buffer!!, bufferPos, offset, offset + remainingLength)
-                t0 += BLOCK_LENGTH_BYTES
-                if (t0 == 0) { // if message > 2^32
-                    t1++
-                }
-                compress(_buffer!!, 0)
-                bufferPos = 0
-                _buffer?.fill(0) // clear buffer
-            } else {
-                input.copyInto(_buffer!!, bufferPos, offset, offset + len)
-                bufferPos += len
-                return
-            }
-        }
-
-        // process blocks except last block (also if last block is full)
-        val blockWiseLastPos = offset + len - BLOCK_LENGTH_BYTES
-        var messagePos: Int = offset + remainingLength
-        while (messagePos < blockWiseLastPos) {
-            // block wise 64 bytes
-            // without buffer:
-            t0 += BLOCK_LENGTH_BYTES
-            if (t0 == 0) {
-                t1++
-            }
-            compress(input, messagePos)
-            messagePos += BLOCK_LENGTH_BYTES
-        }
-
-        // fill the buffer with left bytes, this might be a full block
-        input.copyInto(_buffer!!, 0, messagePos, offset + len)
-        bufferPos += offset + len - messagePos
+        initChainValue()
     }
 
     override fun digest(bitLength: Long, bufferOffset: Int, buffer: ByteArray): ByteArray {
+        val digestLength = digestLength()
         val out = ByteArray(digestLength)
         f0 = -0x1
-        t0 += bufferPos
-        // bufferPos may be < 64, so (t0 == 0) does not work
-        // for 2^32 < message length > 2^32 - 63
-        if (t0 < 0 && bufferPos > -t0) {
-            t1++
-        }
-        compress(_buffer!!, 0)
-        _buffer?.fill(0) // Holds eventually the key if input is null
+        t0 = (bitLength / 8).toInt()
+
+        compress(buffer, 0)
         internalState.fill(0)
         var i = 0
         while (i < chainValue!!.size && i * 4 < digestLength) {
             val bytes = ByteArray(4)
             encodeLEInt(chainValue!![i], bytes, 0)
             if (i * 4 < digestLength - 4) {
-                bytes.copyInto(out, bufferOffset + i * 4, 0, 4)
+                bytes.copyInto(out, i * 4, 0, 4)
             } else {
-                bytes.copyInto(out, bufferOffset + i * 4, 0, digestLength - i * 4)
+                bytes.copyInto(out, i * 4, 0, digestLength - i * 4)
             }
             i++
         }
@@ -299,43 +142,16 @@ public class Blake2s : Digest {
     }
 
     override fun resetDigest() {
-        bufferPos = 0
         f0 = 0
         t0 = 0
-        t1 = 0
         chainValue = null
-        _buffer?.fill(0)
-        if (key != null) {
-            key!!.copyInto(_buffer!!, 0, 0, key!!.size)
-            bufferPos = BLOCK_LENGTH_BYTES // zero padding
-        }
-        init(salt, personalization, key)
+        initChainValue()
     }
 
     override fun copy(state: DigestState): Digest = Blake2s(this)
 
-    /**
-     * Overwrite the key
-     * if it is no longer used (zeroization)
-     */
-    public fun clearKey() {
-        if (key != null) {
-            key?.fill(0)
-            _buffer?.fill(0)
-        }
-    }
-
-    /**
-     * Overwrite the salt (pepper) if it
-     * is secret and no longer used (zeroization)
-     */
-    public fun clearSalt() {
-        if (salt != null) {
-            salt?.fill(0)
-        }
-    }
-
     override fun compress(input: ByteArray, offset: Int) {
+        if (input.size > BLOCK_LENGTH_BYTES) t0 = BLOCK_LENGTH_BYTES
         initInternalState()
         val m = IntArray(16)
         for (j in 0..15) {
@@ -361,41 +177,11 @@ public class Blake2s : Digest {
         }
     }
 
-    // initialize the digest's parameters
-    private fun init(salt: ByteArray?, personalization: ByteArray?, key: ByteArray?) {
-        _buffer = ByteArray(BLOCK_LENGTH_BYTES)
-        if (key != null && key.isNotEmpty()) {
-            require(key.size <= MAX_DIGEST_LENGTH) { "Keys > 32 bytes are not supported" }
-            this.key = key.copyInto(ByteArray(key.size), 0, 0, key.size)
-            keyLength = key.size
-            key.copyInto(_buffer!!, 0, 0, key.size)
-            bufferPos = BLOCK_LENGTH_BYTES // zero padding
-        }
+    private fun initChainValue() {
         if (chainValue == null) {
             chainValue = IntArray(8)
-            chainValue!![0] =
-                (blake2s_IV[0] xor (digestLength or (keyLength shl 8) or (fanout shl 16 or (depth shl 24))))
-            chainValue!![1] = blake2s_IV[1] xor leafLength
-            val nofHi = (nodeOffset shr 32).toInt()
-            val nofLo = nodeOffset.toInt()
-            chainValue!![2] = blake2s_IV[2] xor nofLo
-            chainValue!![3] = blake2s_IV[3] xor (nofHi or (nodeDepth shl 16) or (innerHashLength shl 24))
-            chainValue!![4] = blake2s_IV[4]
-            chainValue!![5] = blake2s_IV[5]
-            if (salt != null) {
-                require(salt.size == 8) { "Salt length must be exactly 8 bytes" }
-                this.salt = salt.copyInto(ByteArray(8), 0, 0, salt.size)
-                chainValue!![4] = chainValue!![4] xor decodeLEInt(salt, 0)
-                chainValue!![5] = chainValue!![5] xor decodeLEInt(salt, 4)
-            }
-            chainValue!![6] = blake2s_IV[6]
-            chainValue!![7] = blake2s_IV[7]
-            if (personalization != null) {
-                require(personalization.size == 8) { "Personalization length must be exactly 8 bytes" }
-                this.personalization = personalization.copyInto(ByteArray(8), 0, 0, personalization.size)
-                chainValue!![6] = chainValue!![6] xor decodeLEInt(personalization, 0)
-                chainValue!![7] = chainValue!![7] xor decodeLEInt(personalization, 4)
-            }
+            blake2s_IV.copyInto(chainValue!!)
+            chainValue!![0] = blake2s_IV[0] xor (digestLength() or 0x1010000)
         }
     }
 
@@ -405,9 +191,9 @@ public class Blake2s : Digest {
         blake2s_IV.copyInto(internalState, chainValue!!.size, 0, 4)
 
         internalState[12] = t0 xor blake2s_IV[4]
-        internalState[13] = t1 xor blake2s_IV[5]
+        internalState[13] = 0 xor blake2s_IV[5]
         internalState[14] = f0 xor blake2s_IV[6]
-        internalState[15] = blake2s_IV[7] // ^ f1 with f1 = 0
+        internalState[15] = blake2s_IV[7]
     }
 
     private fun g(m1: Int, m2: Int, posA: Int, posB: Int, posC: Int, posD: Int) {
@@ -437,18 +223,17 @@ public class Blake2s : Digest {
     }
 
     /**
-     * Encode the 32-bit word [value] into the array
-     * [buf] at offset [off], in little-endian
-     * convention (least significant byte first).
+     * Encode the 32-bit word [value] into the array [dst]
+     * at offset [off], in little-endian convention.
      *
      * @param value the value to encode
-     * @param buf   the destination buffer
+     * @param dst   the destination buffer
      * @param off   the destination offset
      */
-    private fun encodeLEInt(value: Int, buf: ByteArray, off: Int) {
-        buf[off + 0] = value.toByte()
-        buf[off + 1] = (value ushr 8).toByte()
-        buf[off + 2] = (value ushr 16).toByte()
-        buf[off + 3] = (value ushr 24).toByte()
+    private fun encodeLEInt(value: Int, dst: ByteArray, off: Int) {
+        dst[off + 0] = value.toByte()
+        dst[off + 1] = (value ushr 8).toByte()
+        dst[off + 2] = (value ushr 16).toByte()
+        dst[off + 3] = (value ushr 24).toByte()
     }
 }
