@@ -3,6 +3,8 @@ package org.kotlincrypto.hash.blake2
 import org.kotlincrypto.core.InternalKotlinCryptoApi
 import org.kotlincrypto.core.digest.Digest
 import org.kotlincrypto.core.digest.internal.DigestState
+import org.kotlincrypto.endians.LittleEndian
+import org.kotlincrypto.endians.LittleEndian.Companion.toLittleEndian
 
 /*  The BLAKE2 cryptographic hash function was designed by Jean-
  Philippe Aumasson, Samuel Neves, Zooko Wilcox-O'Hearn, and Christian
@@ -152,9 +154,8 @@ public class Blake2b : Digest {
         internalState.fill(0L)
         var i = 0
         while (i < chainValue!!.size && i * 8 < digestLength) {
-            val bytes = ByteArray(8)
-            encodeLELong(chainValue!![i], bytes, 0)
-            if (i * 8 < digestLength() - 8) {
+            val bytes = chainValue!![i].toLittleEndian()
+            if (i * 8 < digestLength - 8) {
                 bytes.copyInto(out, i * 8, 0, 8)
             } else {
                 bytes.copyInto(out, i * 8, 0, digestLength - i * 8)
@@ -180,7 +181,17 @@ public class Blake2b : Digest {
         initInternalState()
         val m = LongArray(16)
         for (j in 0..15) {
-            m[j] = decodeLELong(input, offset + j * 8)
+            var startIndex = offset + j * 8
+            m[j] = LittleEndian.bytesToLong(
+                input[startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+            )
         }
         for (round in 0 until ROUNDS_IN_COMPRESS) {
             // G apply to columns of internalState
@@ -230,42 +241,5 @@ public class Blake2b : Digest {
         internalState[posD] = (internalState[posD] xor internalState[posA]).rotateRight(16)
         internalState[posC] = internalState[posC] + internalState[posD]
         internalState[posB] = (internalState[posB] xor internalState[posC]).rotateRight(63) // replaces 11 of BLAKE
-    }
-
-    /**
-     * Decode a 64-bit little-endian word from the array [buf]
-     *
-     * @param buf the source buffer
-     * @param off the source offset
-     * @return the decoded value
-     */
-    private inline fun decodeLELong(buf: ByteArray, off: Int): Long {
-        return buf[off + 0].toLong() and 0xFF or
-                ((buf[off + 1].toLong() and 0xFF) shl 8) or
-                ((buf[off + 2].toLong() and 0xFF) shl 16) or
-                ((buf[off + 3].toLong() and 0xFF) shl 24) or
-                ((buf[off + 4].toLong() and 0xFF) shl 32) or
-                ((buf[off + 5].toLong() and 0xFF) shl 40) or
-                ((buf[off + 6].toLong() and 0xFF) shl 48) or
-                ((buf[off + 7].toLong() and 0xFF) shl 56)
-    }
-
-    /**
-     * Encode the 64-bit word [value] into the array [dst]
-     * at offset [off], in little-endian convention.
-     *
-     * @param [value] the integer to encode
-     * @param dst     the destination buffer
-     * @param off     the destination offset
-     */
-    private fun encodeLELong(value: Long, dst: ByteArray, off: Int) {
-        dst[off + 0] = value.toByte()
-        dst[off + 1] = (value.toInt() ushr 8).toByte()
-        dst[off + 2] = (value.toInt() ushr 16).toByte()
-        dst[off + 3] = (value.toInt() ushr 24).toByte()
-        dst[off + 4] = (value ushr 32).toByte()
-        dst[off + 5] = (value ushr 40).toByte()
-        dst[off + 6] = (value ushr 48).toByte()
-        dst[off + 7] = (value ushr 56).toByte()
     }
 }

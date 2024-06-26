@@ -3,6 +3,8 @@ package org.kotlincrypto.hash.blake2
 import org.kotlincrypto.core.InternalKotlinCryptoApi
 import org.kotlincrypto.core.digest.Digest
 import org.kotlincrypto.core.digest.internal.DigestState
+import org.kotlincrypto.endians.LittleEndian
+import org.kotlincrypto.endians.LittleEndian.Companion.toLittleEndian
 
 /*
   The BLAKE2 cryptographic hash function was designed by Jean-
@@ -127,8 +129,7 @@ public class Blake2s : Digest {
         internalState.fill(0)
         var i = 0
         while (i < chainValue!!.size && i * 4 < digestLength) {
-            val bytes = ByteArray(4)
-            encodeLEInt(chainValue!![i], bytes, 0)
+            val bytes = chainValue!![i].toLittleEndian()
             if (i * 4 < digestLength - 4) {
                 bytes.copyInto(out, i * 4, 0, 4)
             } else {
@@ -155,7 +156,13 @@ public class Blake2s : Digest {
         initInternalState()
         val m = IntArray(16)
         for (j in 0..15) {
-            m[j] = decodeLEInt(input, offset + j * 4)
+            var startIndex = offset + j * 4
+            m[j] = LittleEndian.bytesToInt(
+                input[startIndex],
+                input[++startIndex],
+                input[++startIndex],
+                input[++startIndex],
+            )
         }
         for (round in 0 until ROUNDS_IN_COMPRESS) {
             // G apply to columns of internalState:
@@ -205,35 +212,5 @@ public class Blake2s : Digest {
         internalState[posD] = (internalState[posD] xor internalState[posA]).rotateRight(8)
         internalState[posC] = internalState[posC] + internalState[posD]
         internalState[posB] = (internalState[posB] xor internalState[posC]).rotateRight(7)
-    }
-
-    /**
-     * Decode a 32-bit little-endian word from the array [buf]
-     * at offset [off].
-     *
-     * @param buf the source buffer
-     * @param off the source offset
-     * @return the decoded value
-     */
-    private inline fun decodeLEInt(buf: ByteArray, off: Int): Int {
-        return (buf[off + 3].toInt() and 0xFF shl 24) or
-                (buf[off + 2].toInt() and 0xFF shl 16) or
-                (buf[off + 1].toInt() and 0xFF shl 8) or
-                (buf[off].toInt() and 0xFF)
-    }
-
-    /**
-     * Encode the 32-bit word [value] into the array [dst]
-     * at offset [off], in little-endian convention.
-     *
-     * @param value the value to encode
-     * @param dst   the destination buffer
-     * @param off   the destination offset
-     */
-    private fun encodeLEInt(value: Int, dst: ByteArray, off: Int) {
-        dst[off + 0] = value.toByte()
-        dst[off + 1] = (value ushr 8).toByte()
-        dst[off + 2] = (value ushr 16).toByte()
-        dst[off + 3] = (value ushr 24).toByte()
     }
 }
