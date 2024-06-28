@@ -1,10 +1,8 @@
 package org.kotlincrypto.hash.blake2
 
-import org.kotlincrypto.core.InternalKotlinCryptoApi
 import org.kotlincrypto.core.digest.Digest
 import org.kotlincrypto.core.digest.internal.DigestState
-import org.kotlincrypto.endians.LittleEndian
-import org.kotlincrypto.endians.LittleEndian.Companion.toLittleEndian
+import org.kotlincrypto.endians.LittleEndian.Companion.bytesToInt
 
 /*
   The BLAKE2 cryptographic hash function was designed by Jean-
@@ -40,41 +38,11 @@ import org.kotlincrypto.endians.LittleEndian.Companion.toLittleEndian
  * BLAKE2s is optimized for 32-bit platforms and produces digests of any size
  * between 1 and 32 bytes.
  */
-public class Blake2s : Digest {
+public class Blake2s : Blake2 {
     public companion object {
-        // To use for Catenas H'
-        private const val ROUNDS_IN_COMPRESS = 10
-
-        // The size in bytes of the internal buffer the digest applies its compression
+        private const val MAX_DIGEST_BITS_LENGTH = 256
         private const val BLOCK_LENGTH_BYTES: Int = 64
-
         private const val ALGORITHM_NAME = "BLAKE2s"
-
-        // BLAKE2s Initialization Vector:
-        private val blake2s_IV = intArrayOf(
-            0x6a09e667,
-            -0x4498517b,
-            0x3c6ef372,
-            -0x5ab00ac6,
-            0x510e527f,
-            -0x64fa9774,
-            0x1f83d9ab,
-            0x5be0cd19
-        )
-
-        // Message word permutations:
-        private val blake2s_sigma = arrayOf(
-            byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
-            byteArrayOf(14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3),
-            byteArrayOf(11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4),
-            byteArrayOf(7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8),
-            byteArrayOf(9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13),
-            byteArrayOf(2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9),
-            byteArrayOf(12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11),
-            byteArrayOf(13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10),
-            byteArrayOf(6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5),
-            byteArrayOf(10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0)
-        )
 
         /**
          * Hash [input] as Blake2s-128 .
@@ -87,130 +55,74 @@ public class Blake2s : Digest {
         }
     }
 
-    // Internal state, in the BLAKE2 paper it is called v
-    private val internalState = IntArray(16)
+    override val roundsInCompress: Int = 10
+    override val sizeBytes: Int = Int.SIZE_BYTES
+    override val r1: Int = 16
+    override val r2: Int = 12
+    override val r3: Int = 8
+    override val r4: Int = 7
 
-    // State vector, in the BLAKE2 paper it is called h
-    private var chainValue: IntArray? = null
+    override val blakeIV: Array<Blake2Word>
+        get() = arrayOf(
+            Blake2Word.Blake2sWord(0x6a09e667),
+            Blake2Word.Blake2sWord(-0x4498517b),
+            Blake2Word.Blake2sWord(0x3c6ef372),
+            Blake2Word.Blake2sWord(-0x5ab00ac6),
+            Blake2Word.Blake2sWord(0x510e527f),
+            Blake2Word.Blake2sWord(-0x64fa9774),
+            Blake2Word.Blake2sWord(0x1f83d9ab),
+            Blake2Word.Blake2sWord(0x5be0cd19),
+        )
+    override val blakeSigma: Array<ByteArray>
+        get() = arrayOf(
+            byteArrayOf(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15),
+            byteArrayOf(14, 10, 4, 8, 9, 15, 13, 6, 1, 12, 0, 2, 11, 7, 5, 3),
+            byteArrayOf(11, 8, 12, 0, 5, 2, 15, 13, 10, 14, 3, 6, 7, 1, 9, 4),
+            byteArrayOf(7, 9, 3, 1, 13, 12, 11, 14, 2, 6, 5, 10, 4, 0, 15, 8),
+            byteArrayOf(9, 0, 5, 7, 2, 4, 10, 15, 14, 1, 11, 12, 6, 8, 3, 13),
+            byteArrayOf(2, 12, 6, 10, 0, 11, 8, 3, 4, 13, 7, 5, 15, 14, 1, 9),
+            byteArrayOf(12, 5, 1, 15, 14, 13, 4, 10, 0, 7, 6, 3, 9, 2, 8, 11),
+            byteArrayOf(13, 11, 7, 14, 12, 1, 3, 9, 5, 0, 15, 4, 8, 6, 2, 10),
+            byteArrayOf(6, 15, 14, 9, 11, 3, 0, 8, 12, 2, 13, 7, 1, 4, 10, 5),
+            byteArrayOf(10, 2, 8, 4, 7, 6, 1, 5, 15, 11, 9, 14, 3, 12, 13, 0)
+        )
 
-    // holds last significant bits of counter (counts bytes)
-    private var t0 = 0
+    public constructor(digestBits: Int = MAX_DIGEST_BITS_LENGTH) : super(
+        ALGORITHM_NAME,
+        BLOCK_LENGTH_BYTES,
+        digestBits
+    ) {
+        require(digestBits in 8..MAX_DIGEST_BITS_LENGTH && digestBits % 8 == 0) {
+            "$ALGORITHM_NAME digest bit length must be a multiple of 8 and not greater than $MAX_DIGEST_BITS_LENGTH"
+        }
+        t0 = createWord(0L)
+        f0 = createWord(0L)
+        initChainValue()
+    }
 
-    // finalization flag, for last block: ~0
-    private var f0 = 0
-
-    @OptIn(InternalKotlinCryptoApi::class)
     public constructor(digest: Blake2s) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digest.digestLength()) {
         chainValue = digest.chainValue?.copyOf()
         t0 = digest.t0
         f0 = digest.f0
     }
 
-    /**
-     * BLAKE2s-256 for hashing.
-     *
-     * @param digestBits the desired digest length in bits. Must be a multiple of 8 and less than 256.
-     */
-    @OptIn(InternalKotlinCryptoApi::class)
-    public constructor(digestBits: Int = 256) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digestBits / 8) {
-        require(!(digestBits < 8 || digestBits > 256 || digestBits % 8 != 0)) {
-            "BLAKE2s digest bit length must be a multiple of 8 and not greater than 256"
-        }
-        initChainValue()
-    }
-
-    override fun digest(bitLength: Long, bufferOffset: Int, buffer: ByteArray): ByteArray {
-        val digestLength = digestLength()
-        val out = ByteArray(digestLength)
-        f0 = -0x1
-        t0 = (bitLength / 8).toInt()
-
-        compress(buffer, 0)
-        internalState.fill(0)
-        var i = 0
-        while (i < chainValue!!.size && i * 4 < digestLength) {
-            val bytes = chainValue!![i].toLittleEndian()
-            if (i * 4 < digestLength - 4) {
-                bytes.copyInto(out, i * 4, 0, 4)
-            } else {
-                bytes.copyInto(out, i * 4, 0, digestLength - i * 4)
-            }
-            i++
-        }
-        chainValue?.fill(0)
-        reset()
-        return out
-    }
-
-    override fun resetDigest() {
-        f0 = 0
-        t0 = 0
-        chainValue = null
-        initChainValue()
-    }
-
     override fun copy(state: DigestState): Digest = Blake2s(this)
 
-    override fun compress(input: ByteArray, offset: Int) {
-        if (input.size > BLOCK_LENGTH_BYTES) t0 = BLOCK_LENGTH_BYTES
-        initInternalState()
-        val m = IntArray(16)
+    override fun createM(input: ByteArray, offset: Int): Array<Blake2Word> {
+        val m = Array<Blake2Word>(16) { Blake2Word.Blake2sWord(0) }
         for (j in 0..15) {
-            var startIndex = offset + j * 4
-            m[j] = LittleEndian.bytesToInt(
-                input[startIndex],
-                input[++startIndex],
-                input[++startIndex],
-                input[++startIndex],
+            var startIndex = offset + j * sizeBytes
+            m[j] = Blake2Word.Blake2sWord(
+                bytesToInt(
+                    input[startIndex],
+                    input[++startIndex],
+                    input[++startIndex],
+                    input[++startIndex],
+                )
             )
         }
-        for (round in 0 until ROUNDS_IN_COMPRESS) {
-            // G apply to columns of internalState:
-            // m[blake2s_sigma[round][2 * blockPos]] /+1
-            g(m[blake2s_sigma[round][0].toInt()], m[blake2s_sigma[round][1].toInt()], 0, 4, 8, 12)
-            g(m[blake2s_sigma[round][2].toInt()], m[blake2s_sigma[round][3].toInt()], 1, 5, 9, 13)
-            g(m[blake2s_sigma[round][4].toInt()], m[blake2s_sigma[round][5].toInt()], 2, 6, 10, 14)
-            g(m[blake2s_sigma[round][6].toInt()], m[blake2s_sigma[round][7].toInt()], 3, 7, 11, 15)
-            // G apply to diagonals of internalState:
-            g(m[blake2s_sigma[round][8].toInt()], m[blake2s_sigma[round][9].toInt()], 0, 5, 10, 15)
-            g(m[blake2s_sigma[round][10].toInt()], m[blake2s_sigma[round][11].toInt()], 1, 6, 11, 12)
-            g(m[blake2s_sigma[round][12].toInt()], m[blake2s_sigma[round][13].toInt()], 2, 7, 8, 13)
-            g(m[blake2s_sigma[round][14].toInt()], m[blake2s_sigma[round][15].toInt()], 3, 4, 9, 14)
-        }
-
-        // update chain values:
-        for (position in chainValue!!.indices) {
-            chainValue!![position] = chainValue!![position] xor internalState[position] xor internalState[position + 8]
-        }
+        return m
     }
 
-    private fun initChainValue() {
-        if (chainValue == null) {
-            chainValue = IntArray(8)
-            blake2s_IV.copyInto(chainValue!!)
-            chainValue!![0] = blake2s_IV[0] xor (digestLength() or 0x1010000)
-        }
-    }
-
-    private fun initInternalState() {
-        // initialize v:
-        chainValue!!.copyInto(internalState, 0, 0, chainValue!!.size)
-        blake2s_IV.copyInto(internalState, chainValue!!.size, 0, 4)
-
-        internalState[12] = t0 xor blake2s_IV[4]
-        internalState[13] = 0 xor blake2s_IV[5]
-        internalState[14] = f0 xor blake2s_IV[6]
-        internalState[15] = blake2s_IV[7]
-    }
-
-    private fun g(m1: Int, m2: Int, posA: Int, posB: Int, posC: Int, posD: Int) {
-        internalState[posA] = internalState[posA] + internalState[posB] + m1
-        internalState[posD] = (internalState[posD] xor internalState[posA]).rotateRight(16)
-        internalState[posC] = internalState[posC] + internalState[posD]
-        internalState[posB] = (internalState[posB] xor internalState[posC]).rotateRight(12)
-        internalState[posA] = internalState[posA] + internalState[posB] + m2
-        internalState[posD] = (internalState[posD] xor internalState[posA]).rotateRight(8)
-        internalState[posC] = internalState[posC] + internalState[posD]
-        internalState[posB] = (internalState[posB] xor internalState[posC]).rotateRight(7)
-    }
+    override fun createWord(value: Long): Blake2Word = Blake2Word.Blake2sWord(value.toInt())
 }
