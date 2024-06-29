@@ -1,34 +1,4 @@
-public abstract class org/kotlincrypto/hash/blake2/Blake2 : org/kotlincrypto/core/digest/Digest {
-	protected field f0 Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected field t0 Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	public fun <init> (Ljava/lang/String;II)V
-	protected fun compress ([BI)V
-	protected abstract fun copy (Lorg/kotlincrypto/core/digest/internal/DigestState;)Lorg/kotlincrypto/core/digest/Digest;
-	protected abstract fun createM ([BI)[Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected abstract fun createWord (J)Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected fun digest (JI[B)[B
-	protected abstract fun getBlakeIV ()[Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected abstract fun getBlakeSigma ()[[B
-	protected final fun getChainValue ()[Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected final fun getF0 ()Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected abstract fun getR1 ()I
-	protected abstract fun getR2 ()I
-	protected abstract fun getR3 ()I
-	protected abstract fun getR4 ()I
-	protected abstract fun getRoundsInCompress ()I
-	protected abstract fun getSizeBytes ()I
-	protected final fun getT0 ()Lorg/kotlincrypto/hash/blake2/Blake2Word;
-	protected final fun initChainValue ()V
-	protected fun resetDigest ()V
-	protected final fun setChainValue ([Lorg/kotlincrypto/hash/blake2/Blake2Word;)V
-	protected final fun setF0 (Lorg/kotlincrypto/hash/blake2/Blake2Word;)V
-	protected final fun setT0 (Lorg/kotlincrypto/hash/blake2/Blake2Word;)V
-}
-
-public abstract class org/kotlincrypto/hash/blake2/Blake2Word {
-}
-
-public final class org/kotlincrypto/hash/blake2/Blake2b : org/kotlincrypto/hash/blake2/Blake2 {
+public final class org/kotlincrypto/hash/blake2/Blake2b : org/kotlincrypto/core/digest/Digest {
 	public static final field Companion Lorg/kotlincrypto/hash/blake2/Blake2b$Companion;
 	public fun <init> (I)V
 	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -41,7 +11,7 @@ public final class org/kotlincrypto/hash/blake2/Blake2b$Companion {
 	public final fun blake2bHash256 ([B)[B
 }
 
-public final class org/kotlincrypto/hash/blake2/Blake2s : org/kotlincrypto/hash/blake2/Blake2 {
+public final class org/kotlincrypto/hash/blake2/Blake2s : org/kotlincrypto/core/digest/Digest {
 	public static final field Companion Lorg/kotlincrypto/hash/blake2/Blake2s$Companion;
 	public fun <init> (I)V
 	public synthetic fun <init> (IILkotlin/jvm/internal/DefaultConstructorMarker;)V
