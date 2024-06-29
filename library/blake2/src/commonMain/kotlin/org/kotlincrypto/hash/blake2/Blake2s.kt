@@ -3,7 +3,7 @@ package org.kotlincrypto.hash.blake2
 import org.kotlincrypto.core.InternalKotlinCryptoApi
 import org.kotlincrypto.core.digest.Digest
 import org.kotlincrypto.core.digest.internal.DigestState
-import org.kotlincrypto.endians.LittleEndian
+import org.kotlincrypto.endians.LittleEndian.Companion.bytesToInt
 import org.kotlincrypto.endians.LittleEndian.Companion.toLittleEndian
 
 /*
@@ -47,7 +47,7 @@ public class Blake2s : Digest {
 
         // The size in bytes of the internal buffer the digest applies its compression
         private const val BLOCK_LENGTH_BYTES: Int = 64
-
+        private const val MAX_DIGEST_BITS_LENGTH: Int = 256
         private const val ALGORITHM_NAME = "BLAKE2s"
 
         // BLAKE2s Initialization Vector:
@@ -112,9 +112,13 @@ public class Blake2s : Digest {
      * @param digestBits the desired digest length in bits. Must be a multiple of 8 and less than 256.
      */
     @OptIn(InternalKotlinCryptoApi::class)
-    public constructor(digestBits: Int = 256) : super(ALGORITHM_NAME, BLOCK_LENGTH_BYTES, digestBits / 8) {
-        require(!(digestBits < 8 || digestBits > 256 || digestBits % 8 != 0)) {
-            "BLAKE2s digest bit length must be a multiple of 8 and not greater than 256"
+    public constructor(digestBits: Int = MAX_DIGEST_BITS_LENGTH) : super(
+        ALGORITHM_NAME,
+        BLOCK_LENGTH_BYTES,
+        digestBits / Byte.SIZE_BITS
+    ) {
+        require(!(digestBits < Byte.SIZE_BITS || digestBits > MAX_DIGEST_BITS_LENGTH || digestBits % Byte.SIZE_BITS != 0)) {
+            "$ALGORITHM_NAME digest bit length must be a multiple of ${Byte.SIZE_BITS} and not greater than $MAX_DIGEST_BITS_LENGTH"
         }
         initChainValue()
     }
@@ -123,17 +127,18 @@ public class Blake2s : Digest {
         val digestLength = digestLength()
         val out = ByteArray(digestLength)
         f0 = -0x1
-        t0 = (bitLength / 8).toInt()
+        t0 = (bitLength / Byte.SIZE_BITS).toInt()
 
         compress(buffer, 0)
         internalState.fill(0)
         var i = 0
-        while (i < chainValue!!.size && i * 4 < digestLength) {
+        val intSizeBytes = Int.SIZE_BYTES
+        while (i < chainValue!!.size && i * intSizeBytes < digestLength) {
             val bytes = chainValue!![i].toLittleEndian()
-            if (i * 4 < digestLength - 4) {
-                bytes.copyInto(out, i * 4, 0, 4)
+            if (i * intSizeBytes < digestLength - intSizeBytes) {
+                bytes.copyInto(out, i * intSizeBytes, 0, intSizeBytes)
             } else {
-                bytes.copyInto(out, i * 4, 0, digestLength - i * 4)
+                bytes.copyInto(out, i * intSizeBytes, 0, digestLength - i * intSizeBytes)
             }
             i++
         }
@@ -156,8 +161,8 @@ public class Blake2s : Digest {
         initInternalState()
         val m = IntArray(16)
         for (j in 0..15) {
-            var startIndex = offset + j * 4
-            m[j] = LittleEndian.bytesToInt(
+            var startIndex = offset + j * Int.SIZE_BYTES
+            m[j] = bytesToInt(
                 input[startIndex],
                 input[++startIndex],
                 input[++startIndex],
